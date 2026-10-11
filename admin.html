@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>الإدارة</title>
+<style>
+:root{--y:#FFC400;--yd:#E6AC00;--yl:#FFF3C4;--r:#D62828;--rd:#B01E1E;--bg:#FFFBF0;--ink:#1c1c1c;--mut:#6b6b6b;--bd:#e8e2d0;--sh:0 2px 10px rgba(0,0,0,.07)}
+*{box-sizing:border-box;margin:0}
+body{font-family:Tahoma,"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);line-height:1.6;overflow-x:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;transition:transform .12s}button:active{transform:scale(.96)}
+:focus-visible{outline:3px solid var(--r);outline-offset:2px}
+.top{background:var(--y);padding:10px 14px;display:flex;gap:10px;align-items:center;position:sticky;top:0;z-index:20;box-shadow:var(--sh)}
+.top h1{font-size:18px;flex:1}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:10px 14px;background:#fff;border-bottom:1px solid var(--bd);position:sticky;top:60px;z-index:19}
+.tabs button{background:var(--yl);border-radius:10px;padding:8px 14px;white-space:nowrap;font-weight:700;min-height:42px}
+.tabs button.on{background:var(--r);color:#fff}
+.wrap{max-width:960px;margin:0 auto;padding:14px}
+.card{background:#fff;border-radius:16px;box-shadow:var(--sh);padding:14px;margin-bottom:14px}
+.btn{background:var(--y);border-radius:12px;padding:8px 14px;font-weight:700;min-height:42px}
+.btn.red{background:var(--r);color:#fff}.btn.ghost{background:#fff;border:2px solid var(--bd)}.btn.sm{min-height:34px;padding:4px 10px}
+label{display:block;font-weight:700;margin:10px 0 4px;font-size:14px}
+input,select,textarea{width:100%;padding:10px;border:2px solid var(--bd);border-radius:10px;background:#fff}
+input[type=checkbox]{width:auto}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.row>*{flex:1;min-width:120px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.stat{background:#fff;border-radius:16px;padding:14px;box-shadow:var(--sh);border-top:5px solid var(--y)}.stat b{font-size:28px;display:block}
+.item{display:flex;gap:8px;align-items:center;padding:10px 0;border-bottom:1px solid var(--bd)}
+.item .nm{flex:1;overflow-wrap:anywhere}.item small{color:var(--mut);display:block}
+.tag{background:var(--yl);border-radius:8px;padding:1px 8px;font-size:12px;font-weight:700}
+.vrow{border:1px dashed var(--bd);border-radius:12px;padding:8px;margin-bottom:8px}
+.warn{background:var(--yl);border-right:5px solid var(--r);padding:10px 12px;border-radius:10px;margin-bottom:14px;font-size:14px}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40;display:flex;align-items:center;justify-content:center;padding:14px}
+.modal{background:#fff;border-radius:20px;padding:18px;max-width:440px;width:100%}
+#toasts{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:60;display:flex;flex-direction:column;gap:8px;width:min(92vw,380px)}
+.toast{background:var(--ink);color:#fff;padding:12px 16px;border-radius:14px;border-right:6px solid var(--y)}.toast.bad{border-color:var(--r)}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<div id="denied" class="wrap hide"><div class="card"><h2>لازم تسجل دخول</h2><p style="margin:8px 0 12px">سجل دخولك من الصفحة الرئيسية أولاً (نفس المتصفح)، وبعدين ارجع هنا.</p><a class="btn" style="display:inline-block;text-decoration:none;color:inherit" href="index.html">الصفحة الرئيسية</a></div></div>
+<div id="app" class="hide">
+ <header class="top"><h1>⚙️ إدارة <span id="sn"></span></h1><a class="btn ghost" style="text-decoration:none;color:inherit" href="index.html">الموقع</a></header>
+ <nav class="tabs" id="tabs"></nav>
+ <main class="wrap"><div class="warn">تنبيه: هذه الإدارة محلية. التعديلات تنحفظ في متصفح هذا الجهاز فقط ولا تظهر عند الزبائن على أجهزتهم. للنشر العام استخدم «تصدير نسخة احتياطية» وراجع تبويب «النسخ والبيانات».</div><div id="view"></div></main>
+</div>
+<div id="toasts" aria-live="polite"></div>
+
+<script>
+/* ============ CONFIG (نفس القيم في index.html) ============ */
+const CONFIG={STORE_KEY:'pp_data_v1',AUTH_KEY:'pp_auth',COUNTRY_CODE:'964',DEFAULT_WA:'07746520005'};
+const QUALITIES=['أصلي','تجاري','تجاري درجة أولى','نوعية ممتازة','بديل اقتصادي','أصلي سحب إذا متوفر'];
+const $=s=>document.querySelector(s);
+const uid=p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+function h(t,a={},...c){const e=document.createElement(t);for(const k in a){const v=a[k];if(k==='class')e.className=v;else if(k.startsWith('on'))e.addEventListener(k.slice(2),v);else if(k==='value')e.value=v;else if(v!==false&&v!=null)e.setAttribute(k,v)}c.flat(9).forEach(x=>{if(x==null||x===false)return;e.append(x.nodeType?x:document.createTextNode(x))});return e}
+const norm=s=>String(s==null?'':s).toLowerCase().replace(/[\u064B-\u065F\u0670\u0640]/g,'').replace(/[أإآٱ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه').replace(/[گڭک]/g,'ك').replace(/\s+/g,' ').trim();
+const safeUrl=u=>/^(https?:\/\/|data:image\/)/i.test(u||'')?u:'';
+function toast(m,bad){const t=h('div',{class:'toast'+(bad?' bad':'')},m);$('#toasts').append(t);setTimeout(()=>t.remove(),3200)}
+function ask(msg){return new Promise(r=>{const o=h('div',{class:'ov'},h('div',{class:'modal'},h('p',{style:'margin-bottom:14px;white-space:pre-line'},msg),h('div',{class:'row'},h('button',{class:'btn red',onclick:()=>{o.remove();r(1)}},'تأكيد'),h('button',{class:'btn ghost',onclick:()=>{o.remove();r(0)}},'إلغاء'))));document.body.append(o)})}
+function save(){try{localStorage.setItem(CONFIG.STORE_KEY,JSON.stringify(D));return true}catch(e){toast('تعذر الحفظ في المتصفح.',1);return false}}
+function defaults(){return{settings:{shopName:'محل قطع غيار الهواتف',whatsapp:CONFIG.DEFAULT_WA,welcome:'هلا وغلا ضلعي، نورت محلنا ❤️\n\nكل قطع غيار الهواتف اللي تحتاجها تلكاها هنا، دور على شركتك وموديل جهازك، اختار القطعة اللي تريدها، ودز طلبك إلنا على الواتساب بكل سهولة.\n\nحياك الله، وخدمتك على راسنا.',orderIntro:'السلام عليكم ضلعي، اريد اطلب من عندكم:',orderOutro:'اذا القطعة متوفرة، أكدلي السعر والتوفر وطريقة الاستلام.\n\nشكراً حبيبي.',contact:'واتساب: 07746520005',about:'محل لبيع قطع غيار الهواتف لفنيي الصيانة.'},brands:[],models:[],cats:[],parts:[]}}
+function valid(d){const A=Array.isArray;if(!d||typeof d!=='object'||!d.settings||![d.brands,d.models,d.cats,d.parts].every(A))return 'الملف ناقص أو شكله غير صحيح.';
+ const ids=(a)=>a.every(x=>x&&typeof x.id==='string');if(![d.brands,d.models,d.cats,d.parts].every(ids))return 'يوجد عناصر بدون معرّف.';
+ const B=new Set(d.brands.map(x=>x.id)),M=new Set(d.models.map(x=>x.id)),C=new Set(d.cats.map(x=>x.id));
+ if(d.models.some(m=>!B.has(m.brandId)||typeof m.en!=='string'))return 'موديل مربوط بشركة غير موجودة.';
+ if(d.parts.some(p=>!M.has(p.modelId)||!C.has(p.catId)||!A(p.variants)||p.variants.some(v=>!(Number(v.price)>=0))))return 'قطعة فيها ربط أو سعر غير صحيح.';
+ if(d.brands.some(b=>typeof b.en!=='string'))return 'اسم شركة غير صحيح.';return ''}
+function load(){try{const r=localStorage.getItem(CONFIG.STORE_KEY);if(!r)return defaults();const d=JSON.parse(r);const e=valid(d);if(e)throw e;return d}catch(e){toast('البيانات المحفوظة تالفة. افتح الموقع الرئيسي لإعادة الافتراضية أو استورد نسخة احتياطية.',1);return defaults()}}
+let D=load();
+const brand=id=>D.brands.find(x=>x.id===id),model=id=>D.models.find(x=>x.id===id),cat=id=>D.cats.find(x=>x.id===id);
+const isAvail=v=>!!v.avail&&(v.qty==null||v.qty===''||Number(v.qty)>0);
+
+/* ============ التبويبات ============ */
+const TABS=[['dash','الرئيسية'],['brands','الشركات'],['models','الموديلات'],['parts','القطع'],['cats','الأصناف'],['set','الإعدادات'],['data','النسخ والبيانات']];
+let tab='dash';
+function drawTabs(){const t=$('#tabs');t.replaceChildren(...TABS.map(([k,n])=>h('button',{class:k===tab?'on':'',onclick:()=>{tab=k;drawTabs();draw()}},n)))}
+function draw(){const v=$('#view');v.replaceChildren();$('#sn').textContent=D.settings.shopName;({dash,brands,models,parts,cats,set,data})[tab](v)}
+const field=(label,el)=>h('div',{},h('label',{},label),el);
+const sel=(opts,val,ph)=>h('select',{},h('option',{value:''},ph||'— اختر —'),opts.map(([v,t])=>h('option',{value:v,...(v===val?{selected:''}:{})},t)));
+
+function dash(v){const p=D.parts,vs=p.flatMap(x=>x.variants);
+ const st=[['الشركات',D.brands.length],['الموديلات',D.models.length],['القطع',p.length],['نوعيات متوفرة',vs.filter(isAvail).length],['نوعيات غير متوفرة',vs.filter(x=>!isAvail(x)).length]];
+ v.append(h('div',{class:'stats'},st.map(([n,c])=>h('div',{class:'stat'},h('b',{},c),n))));
+ const demo=D.models.filter(m=>m.demo).length+D.parts.filter(x=>x.demo).length;
+ if(demo)v.append(h('div',{class:'warn',style:'margin-top:14px'},'يوجد '+demo+' عنصر تجريبي (موديلات/قطع). احذفها من تبويباتها قبل التشغيل الفعلي.'))}
+
+/* مدير عام للشركات والموديلات والأصناف */
+function crud(v,cfg){const form=h('div',{class:'card'}),list=h('div',{class:'card'});v.append(form,list);let edit=null;
+ const drawForm=()=>{form.replaceChildren();const inp={};form.append(h('h3',{},(edit?'تعديل ':'إضافة ')+cfg.title));
+  cfg.fields.forEach(f=>{let el;if(f.type==='select')el=sel(f.opts(),edit?edit[f.k]:(cfg.pre?cfg.pre(f.k):''),f.ph);else if(f.type==='check')el=h('input',{type:'checkbox',...(edit&&edit[f.k]?{checked:''}:{})});else el=h('input',{type:'text',value:edit?(edit[f.k]||''):'',placeholder:f.ph||'',dir:f.ltr?'ltr':null});inp[f.k]=el;form.append(f.type==='check'?h('label',{},el,' '+f.label):field(f.label,el))});
+  form.append(h('div',{class:'row',style:'margin-top:12px'},h('button',{class:'btn red',onclick:()=>{const o={};cfg.fields.forEach(f=>o[f.k]=f.type==='check'?inp[f.k].checked:inp[f.k].value.trim());const miss=cfg.fields.find(f=>f.req&&!o[f.k]);if(miss)return toast('حقل «'+miss.label+'» مطلوب.',1);
+   if(edit)Object.assign(edit,o);else cfg.arr().push({id:uid(cfg.pfx),...o,...(cfg.extra||{})});if(save()){toast(edit?'تم التعديل ✔':'تمت الإضافة ✔');edit=null;drawForm();drawList()}}},edit?'حفظ التعديل':'إضافة'),edit?h('button',{class:'btn ghost',onclick:()=>{edit=null;drawForm()}},'إلغاء'):null))};
+ const drawList=()=>{list.replaceChildren(h('h3',{},cfg.title+' ('+cfg.arr().length+')'));cfg.arr().forEach(x=>list.append(h('div',{class:'item'},h('div',{class:'nm'},h('b',{},cfg.label(x)),h('small',{},cfg.sub?cfg.sub(x):''),x.hidden?h('span',{class:'tag'},'مخفي'):null,x.demo?h('span',{class:'tag'},'تجريبي'):null),
+  h('button',{class:'btn sm ghost',onclick:()=>{edit=x;drawForm();form.scrollIntoView({behavior:'smooth'})}},'تعديل'),
+  h('button',{class:'btn sm red',onclick:async()=>{if(await ask(cfg.warn(x))){cfg.del(x);if(save()){toast('تم الحذف');draw()}}}},'حذف'))));if(!cfg.arr().length)list.append(h('p',{style:'color:var(--mut)'},'ماكو عناصر.'))};
+ drawForm();drawList()}
+
+function brands(v){crud(v,{title:'شركة',pfx:'b',arr:()=>D.brands,label:b=>b.en+(b.ar?' — '+b.ar:''),sub:b=>D.models.filter(m=>m.brandId===b.id).length+' موديل',
+ fields:[{k:'en',label:'الاسم بالإنجليزية',req:1,ltr:1},{k:'ar',label:'الاسم بالعربية'},{k:'icon',label:'أيقونة (حرف/إيموجي) أو رابط صورة https',ltr:1},{k:'hidden',label:'إخفاء الشركة',type:'check'}],
+ warn:b=>'حذف «'+b.en+'» يحذف '+D.models.filter(m=>m.brandId===b.id).length+' موديل وكل قطعها. متأكد؟',
+ del:b=>{const ms=D.models.filter(m=>m.brandId===b.id).map(m=>m.id);D.parts=D.parts.filter(p=>!ms.includes(p.modelId));D.models=D.models.filter(m=>m.brandId!==b.id);D.brands=D.brands.filter(x=>x!==b)}})}
+function models(v){crud(v,{title:'موديل',pfx:'m',arr:()=>D.models,label:m=>m.en+(m.ar?' — '+m.ar:''),sub:m=>{const b=brand(m.brandId);return (b?b.en:'?')+' • '+D.parts.filter(p=>p.modelId===m.id).length+' قطعة'},
+ fields:[{k:'brandId',label:'الشركة',req:1,type:'select',opts:()=>D.brands.map(b=>[b.id,b.en])},{k:'en',label:'اسم الموديل بالإنجليزية',req:1,ltr:1},{k:'ar',label:'الاسم بالعربية'},{k:'code',label:'رمز/رقم الموديل',ltr:1},{k:'hidden',label:'إخفاء الموديل',type:'check'}],
+ warn:m=>'حذف «'+m.en+'» يحذف '+D.parts.filter(p=>p.modelId===m.id).length+' قطعة تابعة له. متأكد؟',
+ del:m=>{D.parts=D.parts.filter(p=>p.modelId!==m.id);D.models=D.models.filter(x=>x!==m)}})}
+function cats(v){crud(v,{title:'صنف',pfx:'c',arr:()=>D.cats,label:c=>c.name,sub:c=>D.parts.filter(p=>p.catId===c.id).length+' قطعة',fields:[{k:'name',label:'اسم الصنف',req:1}],
+ warn:c=>'حذف «'+c.name+'» يحذف '+D.parts.filter(p=>p.catId===c.id).length+' قطعة داخله. متأكد؟',del:c=>{D.parts=D.parts.filter(p=>p.catId!==c.id);D.cats=D.cats.filter(x=>x!==c)}})}
+
+/* القطع */
+let PF={q:'',b:'',m:'',c:'',a:''};
+function parts(v){const form=h('div',{class:'card'}),fl=h('div',{class:'card'}),list=h('div',{class:'card'});v.append(form,fl,list);let edit=null,vars=[];
+ const drawForm=()=>{form.replaceChildren(h('h3',{},edit?'تعديل قطعة':'إضافة قطعة'));
+  const curM=edit?model(edit.modelId):null;
+  const sB=sel(D.brands.map(b=>[b.id,b.en]),curM?curM.brandId:'','الشركة');const sM=sel([],'','الموديل');const sC=sel(D.cats.map(c=>[c.id,c.name]),edit?edit.catId:'','نوع القطعة');
+  const fillM=(sel0)=>{sM.replaceChildren(h('option',{value:''},'الموديل'),...D.models.filter(m=>m.brandId===sB.value).map(m=>h('option',{value:m.id,...(m.id===sel0?{selected:''}:{})},m.en)))};fillM(edit?edit.modelId:'');sB.onchange=()=>fillM('');
+  const nm=h('input',{value:edit?edit.name:'',placeholder:'مثال: شاشة Galaxy A15'}),ds=h('textarea',{rows:2,value:edit?edit.desc||'':''}),im=h('input',{value:edit?edit.img||'':'',placeholder:'https://...',dir:'ltr'});
+  const vbox=h('div',{});const dv=()=>{vbox.replaceChildren(...vars.map((x,i)=>{const q=h('input',{value:x.quality,list:'ql',placeholder:'الجودة',oninput:()=>x.quality=q.value}),pr=h('input',{type:'number',min:0,step:'250',value:x.price,placeholder:'السعر (دينار)',oninput:()=>x.price=pr.value}),qt=h('input',{type:'number',min:0,value:x.qty==null?'':x.qty,placeholder:'الكمية (اختياري)',oninput:()=>x.qty=qt.value}),av=h('input',{type:'checkbox',...(x.avail?{checked:''}:{}),onchange:()=>x.avail=av.checked}),nt=h('input',{value:x.note||'',placeholder:'ملاحظات فنية',oninput:()=>x.note=nt.value});
+   return h('div',{class:'vrow'},h('div',{class:'row'},q,pr,qt),h('div',{class:'row',style:'margin-top:6px'},nt,h('label',{style:'margin:0'},av,' متوفر'),h('button',{class:'btn sm ghost',onclick:()=>{vars.splice(i,1);dv()}},'حذف النوعية')))}))};
+  vars=edit?edit.variants.map(x=>({...x})):[{quality:'',price:'',qty:'',avail:true,note:''}];dv();
+  form.append(h('div',{class:'row'},field('الشركة',sB),field('الموديل',sM),field('النوع',sC)),field('اسم القطعة',nm),field('الوصف / ملاحظات',ds),field('صورة (رابط اختياري)',im),h('datalist',{id:'ql'},QUALITIES.map(q=>h('option',{value:q}))),h('label',{},'النوعيات والأسعار'),vbox,
+   h('button',{class:'btn sm ghost',onclick:()=>{vars.push({quality:'',price:'',qty:'',avail:true,note:''});dv()}},'+ نوعية أخرى'),
+   h('div',{class:'row',style:'margin-top:12px'},h('button',{class:'btn red',onclick:()=>{
+    if(!sB.value||!sM.value||!sC.value)return toast('اختار الشركة والموديل ونوع القطعة.',1);if(!nm.value.trim())return toast('اكتب اسم القطعة.',1);
+    if(im.value.trim()&&!safeUrl(im.value.trim()))return toast('رابط الصورة لازم يبدأ بـ https://',1);if(!vars.length)return toast('أضف نوعية وحدة على الأقل.',1);
+    const out=[];for(const x of vars){const pr=Number(x.price);if(x.price===''||!isFinite(pr)||pr<0)return toast('سعر غير صحيح.',1);const q=x.qty===''||x.qty==null?null:Number(x.qty);if(q!==null&&(!Number.isInteger(q)||q<0))return toast('الكمية لازم رقم صحيح غير سالب.',1);out.push({quality:String(x.quality||'').trim(),price:pr,qty:q,avail:!!x.avail,note:String(x.note||'').trim()})}
+    const o={modelId:sM.value,catId:sC.value,name:nm.value.trim(),desc:ds.value.trim(),img:im.value.trim(),variants:out};
+    if(edit){Object.assign(edit,o);delete edit.demo}else D.parts.push({id:uid('p'),...o});if(save()){toast('تم الحفظ ✔');edit=null;drawForm();drawList()}}},edit?'حفظ التعديل':'إضافة القطعة'),edit?h('button',{class:'btn ghost',onclick:()=>{edit=null;drawForm()}},'إلغاء'):null))};
+ const drawFilters=()=>{fl.replaceChildren();const q=h('input',{placeholder:'🔍 بحث',value:PF.q,oninput:()=>{PF.q=q.value;drawList()}});
+  const fb=sel(D.brands.map(b=>[b.id,b.en]),PF.b,'كل الشركات'),fm=sel(D.models.filter(m=>!PF.b||m.brandId===PF.b).map(m=>[m.id,m.en]),PF.m,'كل الموديلات'),fc=sel(D.cats.map(c=>[c.id,c.name]),PF.c,'كل الأنواع'),fa=sel([['1','متوفر'],['0','غير متوفر']],PF.a,'كل الحالات');
+  fb.onchange=()=>{PF.b=fb.value;PF.m='';drawFilters();drawList()};fm.onchange=()=>{PF.m=fm.value;drawList()};fc.onchange=()=>{PF.c=fc.value;drawList()};fa.onchange=()=>{PF.a=fa.value;drawList()};
+  fl.append(h('div',{class:'row'},q,fb,fm,fc,fa))};
+ const drawList=()=>{const k=norm(PF.q).split(' ').filter(Boolean);
+  const l=D.parts.filter(p=>{const m=model(p.modelId),b=m&&brand(m.brandId),c=cat(p.catId);if(PF.b&&(!m||m.brandId!==PF.b))return false;if(PF.m&&p.modelId!==PF.m)return false;if(PF.c&&p.catId!==PF.c)return false;
+   if(PF.a==='1'&&!p.variants.some(isAvail))return false;if(PF.a==='0'&&p.variants.some(isAvail))return false;
+   const hay=norm((b?b.en+b.ar:'')+' '+(m?m.en+' '+m.ar:'')+' '+(c?c.name:'')+' '+p.name+' '+p.desc);return k.every(w=>hay.includes(w))});
+  list.replaceChildren(h('h3',{},'القطع ('+l.length+')'));
+  l.forEach(p=>{const m=model(p.modelId),b=m&&brand(m.brandId),c=cat(p.catId);list.append(h('div',{class:'item'},h('div',{class:'nm'},h('b',{},p.name),h('small',{},(b?b.en:'?')+' / '+(m?m.en:'?')+' • '+(c?c.name:'?')),h('small',{},p.variants.map(x=>(x.quality||'—')+': '+Number(x.price).toLocaleString('en-US')+(isAvail(x)?'':' (غير متوفر)')).join(' | ')),p.demo?h('span',{class:'tag'},'تجريبي'):null),
+   h('button',{class:'btn sm ghost',onclick:()=>{edit=p;drawForm();form.scrollIntoView({behavior:'smooth'})}},'تعديل'),
+   h('button',{class:'btn sm red',onclick:async()=>{if(await ask('حذف القطعة «'+p.name+'»؟')){D.parts=D.parts.filter(x=>x!==p);if(save()){toast('تم الحذف');drawList()}}}},'حذف')))});if(!l.length)list.append(h('p',{style:'color:var(--mut)'},'ماكو قطع مطابقة.'))};
+ drawForm();drawFilters();drawList()}
+
+/* الإعدادات */
+function set(v){const s=D.settings,f={};const c=h('div',{class:'card'},h('h3',{},'إعدادات المحل'));
+ [['shopName','اسم المحل','i'],['whatsapp','رقم واتساب (مثال 07746520005)','i'],['welcome','رسالة الترحيب','t'],['orderIntro','بداية رسالة الطلب','t'],['orderOutro','نهاية رسالة الطلب','t'],['contact','معلومات التواصل','t'],['about','نبذة عن المحل','t']].forEach(([k,l,t])=>{f[k]=t==='i'?h('input',{value:s[k]||'',dir:k==='whatsapp'?'ltr':null}):h('textarea',{rows:3,value:s[k]||''});c.append(field(l,f[k]))});
+ c.append(h('p',{style:'margin-top:8px;color:var(--mut)'},'العملة: الدينار العراقي.'),h('button',{class:'btn red',style:'margin-top:12px',onclick:()=>{const wa=f.whatsapp.value.replace(/\D/g,'');if(wa.length<10)return toast('رقم الواتساب غير صحيح.',1);if(!f.shopName.value.trim())return toast('اسم المحل مطلوب.',1);
+  for(const k in f)s[k]=f[k].value.trim();if(save()){toast('تم حفظ الإعدادات ✔');draw()}}},'حفظ الإعدادات'));v.append(c)}
+
+/* البيانات */
+function data(v){v.append(h('div',{class:'card'},h('h3',{},'النسخ الاحتياطي'),h('p',{style:'margin:6px 0 10px'},'البيانات محفوظة في هذا المتصفح فقط (localStorage) ولا تتزامن بين الأجهزة. صدّر نسخة واستوردها على جهاز ثاني عند الحاجة.'),
+ h('div',{class:'row'},h('button',{class:'btn',onclick:()=>{const a=h('a',{href:URL.createObjectURL(new Blob([JSON.stringify(D,null,2)],{type:'application/json'})),download:'parts-backup-'+new Date().toISOString().slice(0,10)+'.json'});document.body.append(a);a.click();a.remove();toast('تم التصدير ✔')}},'تصدير نسخة JSON'),
+ h('button',{class:'btn ghost',onclick:()=>fi.click()},'استيراد ملف JSON'),
+ h('button',{class:'btn red',onclick:async()=>{if(await ask('رح تنمسح كل بياناتك الحالية ويرجع الافتراضي. متأكد؟')){localStorage.removeItem(CONFIG.STORE_KEY);toast('رجعنا البيانات الافتراضية، جاري فتح الموقع...');setTimeout(()=>location.href='index.html',900)}}},'استعادة الافتراضي'))));
+ const fi=h('input',{type:'file',accept:'.json,application/json',class:'hide',onchange:()=>{const f=fi.files[0];if(!f)return;const r=new FileReader();r.onerror=()=>toast('تعذرت قراءة الملف.',1);r.onload=async()=>{let d;try{d=JSON.parse(r.result)}catch(e){return toast('الملف مو JSON صحيح.',1)}const e=valid(d);if(e)return toast(e,1);if(await ask('رح يستبدل الاستيراد بياناتك الحالية ('+d.parts.length+' قطعة). متأكد؟')){D=d;if(save()){toast('تم الاستيراد ✔');draw()}}fi.value=''};r.readAsText(f)}});v.append(fi)}
+
+if(localStorage.getItem(CONFIG.AUTH_KEY)==='1'){$('#app').classList.remove('hide');drawTabs();draw()}else $('#denied').classList.remove('hide');
+</script>
+</body>
+</html>
